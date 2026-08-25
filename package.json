@@ -1,0 +1,29 @@
+{
+  "name": "nft-indexing-x402",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "wrangler dev src/api-server.ts",
+    "dev:api": "wrangler dev src/api-server.ts",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "@supabase/supabase-js": "^2.112.4",
+    "agents-sdk": "^1.0.0",
+    "alchemy-sdk": "^3.6.5",
+    "hono": "^4.13.4"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260823.1",
+    "@types/node": "^26.2.0",
+    "tsx": "^4.23.12",
+    "typescript": "^7.0.2",
+    "wrangler": "^4.125.0"
+  }
+}
