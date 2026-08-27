@@ -3,7 +3,7 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 export interface DbAsset {
   id?: string;
   nft_id?: string;
-  format: 'thumbnail' | 'image' | 'video' | 'audio';
+  format: 'thumbnail' | 'image' | 'video' | 'audio' | '3d_model';
   resolution?: string; // defaults to 'original' in DB
   r2_key: string;
   content_type: string;
@@ -18,6 +18,7 @@ export interface DbNft {
   name: string;
   collection_name: string;
   media_type: string;
+  ai_description?: string;
   cached_at?: string;
 }
 
@@ -32,6 +33,7 @@ export async function upsertNft(db: SupabaseClient, nft: DbNft): Promise<string>
     name: nft.name,
     collection_name: nft.collection_name,
     media_type: nft.media_type,
+    ...(nft.ai_description ? { ai_description: nft.ai_description } : {}),
     cached_at: new Date().toISOString()
   }, { onConflict: 'contract, token_id' }).select('id').single();
 

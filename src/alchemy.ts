@@ -1,5 +1,6 @@
 import { Alchemy, Network, Nft } from 'alchemy-sdk';
 import { NormalizedNFT } from './types';
+import { resolveNftMedia, resolveNftThumb, resolveNftDescription, resolveNftName } from './worker/nftMedia';
 
 export function getAlchemyClient(apiKey: string): Alchemy {
   return new Alchemy({
@@ -27,31 +28,17 @@ export function normalizeUri(uri: string | undefined): string {
  * Converts Alchemy's raw NFT metadata into our normalized internal schema.
  */
 export function normalizeNftMetadata(nft: Nft): NormalizedNFT {
+  const media = resolveNftMedia(nft as any);
+  
   let mediaType: NormalizedNFT['mediaType'] = 'unknown';
-  
-  // Extract URLs
-  const rawMetadata = (nft.raw.metadata || {}) as Record<string, any>;
-  const animationUrl = rawMetadata.animation_url as string | undefined;
-  const imageUrl = nft.image?.originalUrl || rawMetadata.image as string | undefined;
-  
   let sourceUri = '';
 
-  if (animationUrl) {
-    sourceUri = animationUrl;
-    const lowerUrl = animationUrl.toLowerCase();
-    if (lowerUrl.match(/\.(mp4|webm|mov|m4v)$/) || lowerUrl.includes('video')) {
-      mediaType = 'video';
-    } else if (lowerUrl.match(/\.(mp3|wav|ogg|flac)$/) || lowerUrl.includes('audio')) {
-      mediaType = 'audio';
-    } else if (lowerUrl.match(/\.(gif|jpg|jpeg|png|svg|webp)$/)) {
-      mediaType = 'image';
-    } else {
-      // Default to video for animation_url if undetermined, or keep unknown
-      mediaType = 'video'; 
-    }
-  } else if (imageUrl) {
-    sourceUri = imageUrl;
+  if (media.video) {
+    mediaType = 'video';
+    sourceUri = media.video;
+  } else if (media.image) {
     mediaType = 'image';
+    sourceUri = media.image;
   }
 
   // Handle malformed or relative URIs (if any)
@@ -60,11 +47,12 @@ export function normalizeNftMetadata(nft: Nft): NormalizedNFT {
   return {
     contract: nft.contract.address.toLowerCase(),
     tokenId: nft.tokenId,
-    name: nft.name || rawMetadata.name || `${nft.contract.name || 'Unknown'} #${nft.tokenId}`,
+    name: resolveNftName(nft as any),
     collection: nft.contract.name || nft.contract.symbol || 'Unknown Collection',
     mediaType,
     sourceUri,
-    thumbnailUri: nft.image?.thumbnailUrl || undefined,
+    thumbnailUri: resolveNftThumb(nft as any) || undefined,
+    description: resolveNftDescription(nft as any)
   };
 }
 

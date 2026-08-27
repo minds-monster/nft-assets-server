@@ -28,3 +28,4 @@ dist/
 
 # Typescript
 *.tsbuildinfo
+.dev.vars

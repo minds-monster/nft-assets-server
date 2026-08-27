@@ -3,11 +3,22 @@ import { getAlchemyClient, searchNftByKeyword, resolveNftByContract } from './al
 import { getDbClient, getCachedAsset } from './db';
 import { ingestAsset, IngestEnv } from './ingest';
 import { BRANDS, SECTORS, BRANDS_BY_SECTOR, LIVE_BRANDS, LIVE_COLLECTIONS } from './brands';
+import castingDirectorRouter from './routes/casting-director';
+import storyboardRouter from './routes/storyboard';
+import { x402Middleware } from './middleware/x402';
 
 export interface Env extends IngestEnv {
   ALCHEMY_API_KEY: string;
   DATABASE_URL: string;
   DATABASE_KEY: string;
+  X402_WALLET_ADDRESS: string;
+  X402_FACILITATOR_URL?: string;
+  X402_TOKEN_ADDRESS?: string;
+  
+  DOSSIERS?: any; // KVNamespace for caching
+  CASTING_MODEL: string;
+  NVIDIA_API_KEY: string;
+  NVIDIA_BASE_URL: string;
 }
 
 const app = new Hono<{ Bindings: Env }>();
@@ -103,6 +114,17 @@ app.get('/asset/:contractAddress/:tokenId', async (c) => {
   });
 });
 
+// Casting Director (Free & Paid)
+app.route('/casting-director', castingDirectorRouter);
+app.use('/x402/casting-director/*', x402Middleware(1)); 
+app.route('/x402/casting-director', castingDirectorRouter);
+
+// Storyboard (Free & Paid)
+app.route('/storyboard', storyboardRouter);
+app.use('/x402/storyboard/*', x402Middleware(1)); 
+app.route('/x402/storyboard', storyboardRouter);
+
+app.use('/r2/*', x402Middleware(1));
 app.get('/r2/*', async (c) => {
   const env = c.env;
   // Extract the r2_key from the path (e.g., /r2/ethereum/0x.../2/thumbnail.png)

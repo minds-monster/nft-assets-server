@@ -1,4 +1,5 @@
 name = "nft-assets-server"
+account_id = "5b55102b4efe93e9e591db8473aa25da"
 main = "src/api-server.ts"
 compatibility_date = "2024-03-20"
 compatibility_flags = ["nodejs_compat"]
@@ -8,10 +9,21 @@ compatibility_flags = ["nodejs_compat"]
 binding = "R2_BUCKET"
 bucket_name = "nft-assets"
 
+# KV Namespace for caching
+[[kv_namespaces]]
+binding = "DOSSIERS"
+id = "5c402c9b702f475aa88b09d99f2a07b6"
+preview_id = "5c402c9b702f475aa88b09d99f2a07b6" # Using the same ID for local dev; for a strict production setup, create a separate preview KV.
+
 [vars]
 IPFS_GATEWAY_URL = "https://cloudflare-ipfs.com/ipfs/"
-# Secrets (Set via `wrangler secret put`)
+CASTING_MODEL = "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning"
+NVIDIA_BASE_URL = "https://integrate.api.nvidia.com/v1"
+
+# Secrets (Set via `wrangler secret put` in production, or in `.dev.vars` locally)
 # ALCHEMY_API_KEY = ""
 # DATABASE_URL = ""
 # DATABASE_KEY = ""
 # X402_WALLET_ADDRESS = ""
+# X402_TOKEN_ADDRESS = ""
+# NVIDIA_API_KEY = ""

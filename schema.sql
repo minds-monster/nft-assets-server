@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS nfts (
   name text NOT NULL,
   collection_name text,
   media_type text,
+  ai_description text,
   cached_at timestamptz DEFAULT now(),
   UNIQUE (contract, token_id)
 );
@@ -14,7 +15,7 @@ CREATE TABLE IF NOT EXISTS nfts (
 CREATE TABLE IF NOT EXISTS assets (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   nft_id uuid REFERENCES nfts(id) ON DELETE CASCADE,
-  format text NOT NULL, -- 'thumbnail' | 'image' | 'video' | 'audio'
+  format text NOT NULL, -- 'thumbnail' | 'image' | 'video' | 'audio' | '3d_model'
   resolution text NOT NULL DEFAULT 'original',
   r2_key text NOT NULL,
   content_type text NOT NULL,
