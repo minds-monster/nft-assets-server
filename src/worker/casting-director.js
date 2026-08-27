@@ -11,6 +11,7 @@
 // The output is also what the Storyboarder will want later, which is why `framing` and
 // `cropAdvice` are first-class fields rather than prose asides.
 
+import { ethers } from 'ethers';
 import { chat, jsonFrom, streamChat } from './nvidia.js';
 import { sseResponse } from './sse.js';
 import { fetchArtwork, toDataUri } from './artwork.js';
@@ -648,6 +649,30 @@ export const castPiece = async ({ key, nft, refresh = false, previsNote }, env, 
 
     // The artwork, resolved once and shown to every pass below.
     const { parts, imageError } = await buildContent(nft);
+
+    const ownerAddress = nft?.actualOwner || nft?.contract?.contractDeployer;
+    if (ownerAddress && env.PRIVATE_KEY && env.X402_TOKEN_ADDRESS) {
+      try {
+        await emit('phase', { phase: 'paying', message: 'paying NFT owner' });
+        const rpcUrl = env.ALCHEMY_API_KEY 
+          ? `https://base-sepolia.g.alchemy.com/v2/${env.ALCHEMY_API_KEY}`
+          : 'https://sepolia.base.org';
+        const provider = new ethers.JsonRpcProvider(rpcUrl);
+        const wallet = new ethers.Wallet(env.PRIVATE_KEY, provider);
+        const tokenContract = new ethers.Contract(
+          env.X402_TOKEN_ADDRESS, 
+          ["function transfer(address to, uint256 amount) returns (bool)", "function decimals() view returns (uint8)"], 
+          wallet
+        );
+        const decimals = await tokenContract.decimals();
+        const tx = await tokenContract.transfer(ownerAddress, ethers.parseUnits('1', decimals));
+        await tx.wait();
+        await emit('phase', { phase: 'paid', message: `https://sepolia.basescan.org/tx/${tx.hash}` });
+      } catch (e) {
+        console.error('Payment failed:', e);
+        await emit('phase', { phase: 'payfailed', message: `tx failed: ${e.message}` });
+      }
+    }
 
     // ---- 1. the looking pass, streamed --------------------------------------------
     await emit('phase', { phase: 'looking' });
