@@ -620,20 +620,13 @@ export const castPiece = async ({ key, nft, refresh = false, previsNote }, env, 
   }
 
   const cacheKey = `dossier:v${SCHEMA_VERSION}:${key}`;
-
   // `ctx` IS NOT OPTIONAL HERE, whatever the signature suggests. Casting was the one long
   // endpoint that never passed it, so the runtime was free to cancel the whole invocation the
   // moment the response stream was abandoned — killing a finished dossier seconds before the KV
   // write that would have made it permanent. See worker/sse.js's header: the guarantee was
   // written for exactly this handler and this handler was the one opting out of it.
   return sseResponse(async (emit) => {
-    if (!castingStills(nft).length) {
-      throw new Error(
-        'No usable image URL found for this piece. The token may be video-only, or Alchemy ' +
-          'may not have returned any media for it.',
-      );
-    }
-
+    
     // A warm dossier skips every model call, so there is nothing to stream and nothing to
     // wait for — it resolves in one round trip. Saying so is what makes the cache legible
     // rather than making a known piece look skipped.
@@ -644,6 +637,14 @@ export const castPiece = async ({ key, nft, refresh = false, previsNote }, env, 
         return;
       }
     }
+
+    if (!castingStills(nft).length) {
+      throw new Error(
+        'No usable image URL found for this piece. The token may be video-only, or Alchemy ' +
+          'may not have returned any media for it.',
+      );
+    }
+
 
     // The artwork, resolved once and shown to every pass below.
     const { parts, imageError } = await buildContent(nft);

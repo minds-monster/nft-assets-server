@@ -6,8 +6,9 @@ import { castPiece } from '../worker/casting-director.js';
 
 const app = new Hono<{ Bindings: Env }>();
 
-app.get('/:contractAddress/:tokenId', async (c) => {
+app.get('/:chain/:contractAddress/:tokenId', async (c) => {
   const env = c.env;
+  const chain = c.req.param('chain');
   const contractAddress = c.req.param('contractAddress');
   const tokenId = c.req.param('tokenId');
   const refresh = c.req.query('refresh') === 'true';
@@ -21,7 +22,7 @@ app.get('/:contractAddress/:tokenId', async (c) => {
     return c.json({ error: `Failed to fetch NFT from Alchemy: ${error.message}` }, 404);
   }
   
-  const key = `${contractAddress.toLowerCase()}:${tokenId}`;
+  const key = `${chain}:${contractAddress.toLowerCase()}:${tokenId}`;
   
   // castPiece handles KV caching, NVIDIA AI calls, and returns an SSE Response
   return castPiece({ key, nft: rawNft, refresh, previsNote: "" }, env, c.executionCtx);
