@@ -7,6 +7,8 @@ import castingDirectorRouter from './routes/casting-director';
 import storyboardRouter from './routes/storyboard';
 import { x402Middleware } from './middleware/x402';
 
+import { cors } from 'hono/cors';
+
 export interface Env extends IngestEnv {
   ALCHEMY_API_KEY: string;
   DATABASE_URL: string;
@@ -22,6 +24,8 @@ export interface Env extends IngestEnv {
 }
 
 const app = new Hono<{ Bindings: Env }>();
+
+app.use('*', cors());
 
 app.get('/brands', (c) => {
   return c.json({
