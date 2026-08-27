@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { ethers } from 'ethers';
 import { getAlchemyClient, searchNftByKeyword, resolveNftByContract } from './alchemy';
 import { getDbClient, getCachedAsset } from './db';
 import { ingestAsset, IngestEnv } from './ingest';
@@ -16,6 +17,7 @@ export interface Env extends IngestEnv {
   X402_WALLET_ADDRESS: string;
   X402_FACILITATOR_URL?: string;
   X402_TOKEN_ADDRESS?: string;
+  PRIVATE_KEY?: string;
   
   DOSSIERS?: any; // KVNamespace for caching
   CASTING_MODEL: string;
@@ -153,4 +155,65 @@ app.get('/r2/*', async (c) => {
   });
 });
 
+app.post('/fund', async (c) => {
+  const env = c.env;
+  let address = '';
+  
+  try {
+    const body = await c.req.json().catch(() => ({}));
+    address = body.address || c.req.query('address') || '';
+  } catch (e) {
+    address = c.req.query('address') || '';
+  }
+  
+  if (!address) {
+    return c.json({ error: 'Recipient address is required' }, 400);
+  }
+  
+  const tokenAddress = env.X402_TOKEN_ADDRESS;
+  const privateKey = env.PRIVATE_KEY;
+  
+  if (!tokenAddress) {
+    return c.json({ error: 'X402_TOKEN_ADDRESS is not configured in the environment' }, 500);
+  }
+  
+  if (!privateKey) {
+    return c.json({ error: 'PRIVATE_KEY is not configured in the environment' }, 500);
+  }
+  
+  try {
+    const rpcUrl = env.ALCHEMY_API_KEY 
+      ? `https://base-sepolia.g.alchemy.com/v2/${env.ALCHEMY_API_KEY}`
+      : 'https://sepolia.base.org';
+      
+    const provider = new ethers.JsonRpcProvider(rpcUrl);
+    const wallet = new ethers.Wallet(privateKey, provider);
+    
+    const erc20Abi = [
+      "function transfer(address to, uint256 amount) returns (bool)",
+      "function decimals() view returns (uint8)",
+      "function symbol() view returns (string)"
+    ];
+    
+    const tokenContract = new ethers.Contract(tokenAddress, erc20Abi, wallet);
+    const decimals = await tokenContract.decimals();
+    const symbol = await tokenContract.symbol();
+    
+    const amountToSend = ethers.parseUnits('100', decimals);
+    
+    const tx = await tokenContract.transfer(address, amountToSend);
+    await tx.wait();
+    
+    return c.json({
+      success: true,
+      txHash: tx.hash,
+      recipient: address,
+      amount: '100',
+      symbol: symbol
+    });
+  } catch (err: any) {
+    console.error('Funding failed:', err);
+    return c.json({ error: `Funding failed: ${err.message || err}` }, 500);
+  }
+});
 export default app;
