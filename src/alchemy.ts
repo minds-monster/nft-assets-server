@@ -103,26 +103,24 @@ export async function searchNftByKeyword(
 }
 
 /**
- * Gets the current owner of an NFT, falling back to the deployer if no owner is found.
+ * Gets the deployer of the contract (the creator of the collection).
  */
-export async function resolveNftOwner(
+export async function resolveContractDeployer(
   alchemy: Alchemy,
-  contractAddress: string,
-  tokenId: string,
-  nft?: Nft
+  contractAddress: string
 ): Promise<string | undefined> {
   try {
-    const ownersRes = await alchemy.nft.getOwnersForNft(contractAddress, tokenId);
-    if (ownersRes.owners && ownersRes.owners.length > 0) {
-      return ownersRes.owners[0];
+    const res = await alchemy.nft.getNftsForContract(contractAddress, { 
+      pageSize: 1, 
+      withMetadata: true 
+    } as any);
+    
+    if (res.nfts && res.nfts.length > 0) {
+    console.log(res.nfts[0])
+      return (res.nfts[0].contract as any).contractDeployer;
     }
   } catch (err) {
-    console.warn(`Failed to fetch owners for NFT ${contractAddress}:${tokenId}`, err);
-  }
-
-  // Fallback to the provided NFT's deployer if available
-  if (nft && nft.contract) {
-    return (nft.contract as any).contractDeployer || (nft.contract as any).deployerAddress;
+    console.warn(`Failed to fetch NFTs to resolve contract deployer for ${contractAddress}`, err);
   }
   
   return undefined;

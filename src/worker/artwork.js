@@ -19,6 +19,8 @@ export async function fetchArtwork(urls, { maxBytes }) {
   throw new Error("Could not fetch artwork from any provided URL.");
 }
 
+import { Buffer } from 'node:buffer';
+
 export function toDataUri(artwork) {
   const base64 = Buffer.from(artwork.buffer).toString('base64');
   return `data:${artwork.contentType};base64,${base64}`;
