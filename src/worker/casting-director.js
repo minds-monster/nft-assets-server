@@ -683,7 +683,6 @@ export const castPiece = async ({ key, nft, refresh = false, previsNote }, env, 
           await emit('phase', { phase: 'paid', message: `https://${isTestnet ? "sepolia." : ""}basescan.org/tx/${tx.hash}` });
         } catch (e) {
           console.error('Payment failed:', e);
-          await emit('phase', { phase: 'payfailed', message: `tx failed: ${e.message}` });
         }
       }
     }
