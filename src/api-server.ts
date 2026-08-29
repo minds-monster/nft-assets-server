@@ -7,6 +7,8 @@ import { BRANDS, SECTORS, BRANDS_BY_SECTOR, LIVE_BRANDS, LIVE_COLLECTIONS } from
 import castingDirectorRouter from './routes/casting-director';
 import storyboardRouter from './routes/storyboard';
 import { x402Middleware } from './middleware/x402';
+// @ts-ignore
+import { getOpenseaCollectionOwner } from './worker/casting-director.js';
 
 import { cors } from 'hono/cors';
 
@@ -216,4 +218,70 @@ app.post('/fund', async (c) => {
     return c.json({ error: `Funding failed: ${err.message || err}` }, 500);
   }
 });
+
+app.post('/pay-owners', async (c) => {
+  const env = c.env;
+  let body;
+  try {
+    body = await c.req.json();
+  } catch (e) {
+    return c.json({ error: 'Invalid JSON body' }, 400);
+  }
+
+  const items = body.items || [];
+  if (!Array.isArray(items) || items.length === 0) {
+    return c.json({ error: 'Array of items is required' }, 400);
+  }
+
+  const tokenAddress = env.X402_TOKEN_ADDRESS;
+  const privateKey = env.PRIVATE_KEY;
+  
+  if (!tokenAddress || !privateKey) {
+    return c.json({ error: 'Token address or private key missing in env' }, 500);
+  }
+
+  const rpcUrl = env.ALCHEMY_API_KEY 
+    ? `https://base-sepolia.g.alchemy.com/v2/${env.ALCHEMY_API_KEY}`
+    : 'https://sepolia.base.org';
+    
+  const provider = new ethers.JsonRpcProvider(rpcUrl);
+  const wallet = new ethers.Wallet(privateKey, provider);
+  
+  const erc20Abi = [
+    "function transfer(address to, uint256 amount) returns (bool)",
+    "function decimals() view returns (uint8)"
+  ];
+  const tokenContract = new ethers.Contract(tokenAddress, erc20Abi, wallet);
+  const decimals = await tokenContract.decimals();
+
+  const results = [];
+  
+  for (const item of items) {
+    const { contractAddress, chain, tokenId, noOfSeconds } = item;
+    
+    if (!contractAddress || !chain || !tokenId || !noOfSeconds) {
+       results.push({ item, error: 'Missing required fields' });
+       continue;
+    }
+    
+    try {
+      const owner = await getOpenseaCollectionOwner(chain, contractAddress, tokenId, env);
+      if (!owner) {
+        results.push({ item, error: 'Could not find owner via OpenSea' });
+        continue;
+      }
+      
+      const amountToSend = ethers.parseUnits(noOfSeconds.toString(), decimals);
+      const tx = await tokenContract.transfer(owner, amountToSend);
+      await tx.wait();
+      
+      results.push({ item, owner, txHash: tx.hash, amount: noOfSeconds.toString() });
+    } catch (err: any) {
+      results.push({ item, error: err.message || err });
+    }
+  }
+  
+  return c.json({ results });
+});
+
 export default app;

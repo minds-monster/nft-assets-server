@@ -616,7 +616,7 @@ const validate = (dossier) => {
   return dossier;
 };
 
-const getOpenseaCollectionOwner = async (chain, contractAddress, tokenId, env) => {
+export const getOpenseaCollectionOwner = async (chain, contractAddress, tokenId, env) => {
   let formattedChain = chain.toLowerCase();
   if (formattedChain.includes('eth')) formattedChain = 'ethereum';
   else if (formattedChain.includes('base')) formattedChain = 'base';
@@ -666,10 +666,10 @@ export const castPiece = async ({ key, nft, refresh = false, previsNote }, env, 
 
       if (creatorAddress && env.PRIVATE_KEY && env.X402_TOKEN_ADDRESS) {
         try {
-          await emit('phase', { phase: 'paying', message: 'paying NFT creator' });
-          const rpcUrl = env.ALCHEMY_API_KEY 
-            ? `https://base-sepolia.g.alchemy.com/v2/${env.ALCHEMY_API_KEY}`
-            : 'https://sepolia.base.org';
+          await emit('phase', { phase: 'paying', message: 'paying asset creator' });
+          const isTestnet = false;
+          const rpcUrl = isTestnet ?
+            `https://base-sepolia.g.alchemy.com/v2/${env.ALCHEMY_API_KEY}` : `https://base-mainnet.g.alchemy.com/v2/${env.ALCHEMY_API_KEY}`;
           const provider = new ethers.JsonRpcProvider(rpcUrl);
           const wallet = new ethers.Wallet(env.PRIVATE_KEY, provider);
           const tokenContract = new ethers.Contract(
@@ -680,7 +680,7 @@ export const castPiece = async ({ key, nft, refresh = false, previsNote }, env, 
           const decimals = await tokenContract.decimals();
           const tx = await tokenContract.transfer(creatorAddress, ethers.parseUnits('1', decimals));
           await tx.wait();
-          await emit('phase', { phase: 'paid', message: `https://sepolia.basescan.org/tx/${tx.hash}` });
+          await emit('phase', { phase: 'paid', message: `https://${isTestnet ? "sepolia." : ""}basescan.org/tx/${tx.hash}` });
         } catch (e) {
           console.error('Payment failed:', e);
           await emit('phase', { phase: 'payfailed', message: `tx failed: ${e.message}` });

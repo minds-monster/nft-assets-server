@@ -72,7 +72,7 @@ async function testPayment(contractAddress, tokenId) {
     // Process payment using the ownerAddress
     if (ownerAddress && env.PRIVATE_KEY && env.X402_TOKEN_ADDRESS) {
       try {
-        await emit('phase', { phase: 'paying', message: 'paying NFT creator' });
+        await emit('phase', { phase: 'paying', message: 'paying asset creator' });
         const rpcUrl = env.ALCHEMY_API_KEY 
           ? `https://base-sepolia.g.alchemy.com/v2/${env.ALCHEMY_API_KEY}`
           : 'https://sepolia.base.org';
