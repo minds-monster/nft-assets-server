@@ -11,7 +11,7 @@
 // The output is also what the Storyboarder will want later, which is why `framing` and
 // `cropAdvice` are first-class fields rather than prose asides.
 
-import { ethers } from 'ethers';
+import { payCreator } from './payments.js';
 import { chat, jsonFrom, streamChat } from './nvidia.js';
 import { sseResponse } from './sse.js';
 import { fetchArtwork, toDataUri } from './artwork.js';
@@ -616,36 +616,7 @@ const validate = (dossier) => {
   return dossier;
 };
 
-export const getOpenseaCollectionOwner = async (chain, contractAddress, tokenId, env) => {
-  let formattedChain = chain.toLowerCase();
-  if (formattedChain.includes('eth')) formattedChain = 'ethereum';
-  else if (formattedChain.includes('base')) formattedChain = 'base';
-  else if (formattedChain.includes('polygon') || formattedChain.includes('matic')) formattedChain = 'polygon';
-  else if (formattedChain.includes('arb')) formattedChain = 'arbitrum';
-  else if (formattedChain.includes('opt')) formattedChain = 'optimism';
-  else if (formattedChain.includes('zora')) formattedChain = 'zora';
-  else if (formattedChain.includes('blast')) formattedChain = 'blast';
-  else if (formattedChain.includes('avax') || formattedChain.includes('avalanche')) formattedChain = 'avalanche';
 
-  try {
-    const openseaRes = await fetch(`https://api.opensea.io/api/v2/chain/${formattedChain}/contract/${contractAddress}/nfts/${tokenId}/collection`, {
-      headers: {
-        accept: '*/*',
-        'x-api-key': env.OPENSEA_API_KEY
-      }
-    });
-    if (openseaRes.ok) {
-      const openseaData = await openseaRes.json();
-      return openseaData.owner;
-    } else {
-      console.error('OpenSea API error:', await openseaRes.text());
-      return null;
-    }
-  } catch (err) {
-    console.error('Failed to fetch from OpenSea:', err);
-    return null;
-  }
-};
 
 export const castPiece = async ({ key, nft, refresh = false, previsNote }, env, ctx) => {
   if (!key || !nft) {
@@ -661,30 +632,7 @@ export const castPiece = async ({ key, nft, refresh = false, previsNote }, env, 
   return sseResponse(async (emit) => {
 
     if (nft.contract?.address) {
-      const [chain, contractAddress, tokenId] = key.split(':');
-      const creatorAddress = await getOpenseaCollectionOwner(chain, contractAddress, tokenId, env);
-
-      if (creatorAddress && env.PRIVATE_KEY && env.X402_TOKEN_ADDRESS) {
-        try {
-          await emit('phase', { phase: 'paying', message: 'paying asset creator' });
-          const isTestnet = false;
-          const rpcUrl = isTestnet ?
-            `https://base-sepolia.g.alchemy.com/v2/${env.ALCHEMY_API_KEY}` : `https://base-mainnet.g.alchemy.com/v2/${env.ALCHEMY_API_KEY}`;
-          const provider = new ethers.JsonRpcProvider(rpcUrl);
-          const wallet = new ethers.Wallet(env.PRIVATE_KEY, provider);
-          const tokenContract = new ethers.Contract(
-            env.X402_TOKEN_ADDRESS, 
-            ["function transfer(address to, uint256 amount) returns (bool)", "function decimals() view returns (uint8)"], 
-            wallet
-          );
-          const decimals = await tokenContract.decimals();
-          const tx = await tokenContract.transfer(creatorAddress, ethers.parseUnits('1', decimals));
-          await tx.wait();
-          await emit('phase', { phase: 'paid', message: `https://${isTestnet ? "sepolia." : ""}basescan.org/tx/${tx.hash}` });
-        } catch (e) {
-          console.error('Payment failed:', e);
-        }
-      }
+      await payCreator(key, env, emit);
     }
     
     // A warm dossier skips every model call, so there is nothing to stream and nothing to

@@ -28,8 +28,9 @@ export const x402Middleware = (amount: number = 1) => {
         
         if (data.result && data.result.status === '0x1') {
           // In a production app, verify the event logs for correct amount and recipient
-          if (env.X402_TOKEN_ADDRESS) {
-            if (data.result.to && data.result.to.toLowerCase() === env.X402_TOKEN_ADDRESS.toLowerCase()) {
+          const expectedToken = env.X402_TEST_TOKEN_ADDRESS || env.X402_TOKEN_ADDRESS;
+          if (expectedToken) {
+            if (data.result.to && data.result.to.toLowerCase() === expectedToken.toLowerCase()) {
               isSettled = true;
             }
           } else {
@@ -42,11 +43,12 @@ export const x402Middleware = (amount: number = 1) => {
     }
     
     if (!isSettled) {
+      const expectedToken = env.X402_TEST_TOKEN_ADDRESS || env.X402_TOKEN_ADDRESS;
       return c.json({
         error: "Payment Required",
         x402: {
           amount: amount,
-          tokenAddress: env.X402_TOKEN_ADDRESS,
+          tokenAddress: expectedToken,
           chain: 'base-sepolia',
           recipient: env.X402_WALLET_ADDRESS || '0x0',
           facilitator: env.X402_FACILITATOR_URL || 'https://coinbase-x402-facilitator.com'

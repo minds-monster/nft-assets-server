@@ -8,7 +8,7 @@ import castingDirectorRouter from './routes/casting-director';
 import storyboardRouter from './routes/storyboard';
 import { x402Middleware } from './middleware/x402';
 // @ts-ignore
-import { getOpenseaCollectionOwner } from './worker/casting-director.js';
+import { getOpenseaCollectionOwner } from './worker/payments.js';
 
 import { cors } from 'hono/cors';
 
