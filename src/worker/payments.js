@@ -2,15 +2,17 @@ import { ethers } from 'ethers';
 import { Alchemy, Network } from 'alchemy-sdk';
 
 export const getOpenseaCollectionOwner = async (chain, contractAddress, tokenId, env) => {
-  let formattedChain = chain.toLowerCase();
-  if (formattedChain.includes('eth')) formattedChain = 'ethereum';
-  else if (formattedChain.includes('base')) formattedChain = 'base';
-  else if (formattedChain.includes('polygon') || formattedChain.includes('matic')) formattedChain = 'polygon';
-  else if (formattedChain.includes('arb')) formattedChain = 'arbitrum';
-  else if (formattedChain.includes('opt')) formattedChain = 'optimism';
-  else if (formattedChain.includes('zora')) formattedChain = 'zora';
-  else if (formattedChain.includes('blast')) formattedChain = 'blast';
-  else if (formattedChain.includes('avax') || formattedChain.includes('avalanche')) formattedChain = 'avalanche';
+  const openseaChainMap = {
+    'eth-mainnet': 'ethereum',
+    'polygon-mainnet': 'matic',
+    'base-mainnet': 'base',
+    'arb-mainnet': 'arbitrum',
+    'opt-mainnet': 'optimism',
+    'zora-mainnet': 'zora',
+    'blast-mainnet': 'blast',
+    'avax-mainnet': 'avalanche'
+  };
+  const formattedChain = openseaChainMap[chain] || chain.replace('-mainnet', '');
 
   try {
     const openseaRes = await fetch(`https://api.opensea.io/api/v2/chain/${formattedChain}/contract/${contractAddress}/nfts/${tokenId}/collection`, {
@@ -33,21 +35,10 @@ export const getOpenseaCollectionOwner = async (chain, contractAddress, tokenId,
 };
 
 export const getNftHolder = async (chain, contractAddress, tokenId, env) => {
-  let network = Network.ETH_MAINNET;
-  const formattedChain = chain.toLowerCase();
-  
-  if (formattedChain.includes('base')) network = Network.BASE_MAINNET;
-  else if (formattedChain.includes('polygon') || formattedChain.includes('matic')) network = Network.MATIC_MAINNET;
-  else if (formattedChain.includes('arb')) network = Network.ARB_MAINNET;
-  else if (formattedChain.includes('opt')) network = Network.OPT_MAINNET;
-  else if (formattedChain.includes('avax')) network = Network.AVAX_MAINNET;
-  else if (formattedChain.includes('zora')) network = Network.ZORA_MAINNET;
-  else if (formattedChain.includes('blast')) network = Network.BLAST_MAINNET;
-
   try {
     const alchemy = new Alchemy({
       apiKey: env.ALCHEMY_API_KEY,
-      network: network
+      network: chain
     });
     const ownersData = await alchemy.nft.getOwnersForNft(contractAddress, tokenId);
     return ownersData.owners?.[0] || null;
