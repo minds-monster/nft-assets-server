@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
-import { getDbClient, getCachedAsset, DbAsset, upsertAsset } from '../db';
-import { Env } from '../api-server';
+import { getDbClient, getCachedAsset, DbAsset, upsertAsset } from '@nft/db';
+import { Env } from '../index';
 
 const app = new Hono<{ Bindings: Env }>();
 

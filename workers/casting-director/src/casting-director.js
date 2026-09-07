@@ -15,7 +15,7 @@ import { payCreator } from './payments.js';
 import { chat, jsonFrom, streamChat } from './nvidia.js';
 import { sseResponse } from './sse.js';
 import { fetchArtwork, toDataUri } from './artwork.js';
-import { getAlchemyClient } from '../alchemy';
+import { getAlchemyClient } from '@nft/alchemy';
 import {
   toHttp,
   resolveNftVideo,

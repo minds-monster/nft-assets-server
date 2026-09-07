@@ -4,6 +4,9 @@ main = "src/api-server.ts"
 compatibility_date = "2024-03-20"
 compatibility_flags = ["nodejs_compat"]
 
+[dev]
+port = 8788
+
 # Bind R2 bucket
 [[r2_buckets]]
 binding = "R2_BUCKET"
@@ -27,3 +30,8 @@ NVIDIA_BASE_URL = "https://integrate.api.nvidia.com/v1"
 # X402_WALLET_ADDRESS = ""
 # X402_TOKEN_ADDRESS = ""
 # NVIDIA_API_KEY = ""
+
+[[services]]
+binding = "CASTING_DIRECTOR"
+service = "casting-director"
+

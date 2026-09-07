@@ -4,13 +4,15 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "dev": "wrangler dev src/api-server.ts",
-    "dev:api": "wrangler dev src/api-server.ts",
+    "dev": "npm run dev --workspaces --if-present",
+    "dev:api": "npm run dev -w api-server",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "workers/*"
+  ],
   "type": "commonjs",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",

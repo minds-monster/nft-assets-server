@@ -1,0 +1,8 @@
+{
+  "name": "@nft/alchemy",
+  "version": "1.0.0",
+  "main": "src/index.ts",
+  "dependencies": {
+    "alchemy-sdk": "^3.6.5"
+  }
+}

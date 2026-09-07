@@ -1,6 +1,6 @@
 import { Alchemy, Network, Nft } from 'alchemy-sdk';
-import { NormalizedNFT } from './types';
-import { resolveNftMedia, resolveNftThumb, resolveNftDescription, resolveNftName } from './worker/nftMedia';
+import { NormalizedNFT } from '@nft/types';
+import { resolveNftMedia, resolveNftThumb, resolveNftDescription, resolveNftName } from '../../../workers/casting-director/src/nftMedia';
 
 export function getAlchemyClient(apiKey: string, network: Network | string = Network.ETH_MAINNET): Alchemy {
   return new Alchemy({

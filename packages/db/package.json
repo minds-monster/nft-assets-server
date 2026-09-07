@@ -1,0 +1,8 @@
+{
+  "name": "@nft/db",
+  "version": "1.0.0",
+  "main": "src/index.ts",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.112.4"
+  }
+}

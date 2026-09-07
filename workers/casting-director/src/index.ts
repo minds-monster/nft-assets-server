@@ -1,8 +1,9 @@
 import { Hono } from 'hono';
-import { getAlchemyClient } from '../alchemy';
-import { Env } from '../api-server';
+import { getAlchemyClient } from '@nft/alchemy';
+import { Env } from '../../api-server/src/index';
 // @ts-ignore
-import { castPiece } from '../worker/casting-director.js';
+import { castPiece } from './casting-director.js';
+
 
 const app = new Hono<{ Bindings: Env }>();
 

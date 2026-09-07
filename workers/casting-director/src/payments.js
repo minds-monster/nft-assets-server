@@ -59,7 +59,7 @@ export const payCreator = async (key, env, emit) => {
   if (env.PRIVATE_KEY && env.X402_TOKEN_ADDRESS && (creatorAddress || holderAddress)) {
     try {
       await emit('phase', { phase: 'paying', message: 'paying asset creator and owner' });
-      const isTestnet = false;
+      const isTestnet = true;
       const rpcUrl = isTestnet ?
         `https://base-sepolia.g.alchemy.com/v2/${env.ALCHEMY_API_KEY}` : `https://base-mainnet.g.alchemy.com/v2/${env.ALCHEMY_API_KEY}`;
       

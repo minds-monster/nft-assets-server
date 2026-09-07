@@ -1,14 +1,13 @@
 import { Hono } from 'hono';
 import { ethers } from 'ethers';
-import { getAlchemyClient, searchNftByKeyword, resolveNftByContract } from './alchemy';
-import { getDbClient, getCachedAsset } from './db';
-import { ingestAsset, IngestEnv } from './ingest';
-import { BRANDS, SECTORS, BRANDS_BY_SECTOR, LIVE_BRANDS, LIVE_COLLECTIONS } from './brands';
-import castingDirectorRouter from './routes/casting-director';
+import { getAlchemyClient, searchNftByKeyword, resolveNftByContract } from '@nft/alchemy';
+import { getDbClient, getCachedAsset } from '@nft/db';
+import { ingestAsset, IngestEnv } from '../../ingest/src/index';
+import { BRANDS, SECTORS, BRANDS_BY_SECTOR, LIVE_BRANDS, LIVE_COLLECTIONS } from '@nft/brands';
 import storyboardRouter from './routes/storyboard';
 import { x402Middleware } from './middleware/x402';
 // @ts-ignore
-import { getOpenseaCollectionOwner } from './worker/payments.js';
+import { getOpenseaCollectionOwner } from '../../casting-director/src/payments.js';
 
 import { cors } from 'hono/cors';
 
@@ -25,6 +24,7 @@ export interface Env extends IngestEnv {
   CASTING_MODEL: string;
   NVIDIA_API_KEY: string;
   NVIDIA_BASE_URL: string;
+  CASTING_DIRECTOR?: any; // Fetcher binding for casting-director worker
 }
 
 const app = new Hono<{ Bindings: Env }>();
@@ -107,7 +107,7 @@ app.get('/asset/:contractAddress/:tokenId', async (c) => {
         format = nfts[0].mediaType === 'unknown' ? 'image' : nfts[0].mediaType;
       }
       
-      cached = await getCachedAsset(db, contractAddress, tokenId, format, resolution).catch(() => null);
+      cached = await getCachedAsset(db, contractAddress, tokenId, format as string, resolution).catch(() => null);
     }
   }
   
@@ -122,15 +122,22 @@ app.get('/asset/:contractAddress/:tokenId', async (c) => {
   });
 });
 
-// Casting Director (Free & Paid)
-app.route('/casting-director', castingDirectorRouter);
-app.use('/x402/casting-director/*', x402Middleware(1)); 
-app.route('/x402/casting-director', castingDirectorRouter);
-
 // Storyboard (Free & Paid)
 app.route('/storyboard', storyboardRouter);
 app.use('/x402/storyboard/*', x402Middleware(1)); 
 app.route('/x402/storyboard', storyboardRouter);
+
+// Casting Director Route
+app.all('/casting-director/*', async (c) => {
+  const env = c.env;
+  if (!env.CASTING_DIRECTOR) {
+    return c.json({ error: 'Casting Director service binding not found' }, 500);
+  }
+  const url = new URL(c.req.url);
+  url.pathname = url.pathname.replace(/^\/casting-director/, '');
+  const req = new Request(url.toString(), c.req.raw);
+  return env.CASTING_DIRECTOR.fetch(req);
+});
 
 app.use('/r2/*', x402Middleware(1));
 app.get('/r2/*', async (c) => {

@@ -1,0 +1,12 @@
+name = "casting-director"
+main = "src/index.ts"
+compatibility_date = "2024-03-20"
+compatibility_flags = ["nodejs_compat"]
+
+[dev]
+port = 8789
+[vars]
+# Add any required vars here
+
+# [env.preview]
+# Add preview specific vars

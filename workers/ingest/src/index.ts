@@ -1,7 +1,7 @@
 import { R2Bucket } from '@cloudflare/workers-types';
 import { SupabaseClient } from '@supabase/supabase-js';
-import { upsertNft, upsertAsset, DbNft } from './db';
-import { NormalizedNFT } from './types';
+import { upsertNft, upsertAsset, DbNft } from '@nft/db';
+import { NormalizedNFT } from '@nft/types';
 
 export interface IngestEnv {
   R2_BUCKET: R2Bucket;
