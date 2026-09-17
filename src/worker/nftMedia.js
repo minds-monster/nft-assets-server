@@ -11,6 +11,26 @@ export const IPFS_GATEWAY = 'https://ipfs.io/ipfs/';
 export const toHttp = (url) =>
   url?.startsWith('ipfs://') ? IPFS_GATEWAY + url.slice('ipfs://'.length) : url;
 
+export const getImageFromAlchemy = (nft) => {
+  const metadata = nft?.raw?.metadata ?? nft?.rawMetadata ?? {};
+  const osMetadata = nft?.contract?.openSeaMetadata ?? {};
+
+  const candidate = [
+    nft?.image?.cachedUrl,
+    nft?.image?.pngUrl,
+    nft?.image?.originalUrl,
+    nft?.image?.thumbnailUrl,
+    nft?.media?.[0]?.gateway,
+    metadata.image,
+    metadata.image_url,
+    metadata.display_image_url,
+    metadata.original_image_url,
+    osMetadata.imageUrl,
+  ].find((value) => typeof value === 'string' && value.trim());
+
+  return candidate ? toHttp(candidate.trim()) : null;
+};
+
 // alchemy-sdk v3 moved image fields from `media[]`/`rawMetadata` to a structured
 // `image` object. We read v3 first and keep the v2 keys as a fallback so older
 // cached responses (and the mocks in alchemy.js) still render.
@@ -18,22 +38,15 @@ export const toHttp = (url) =>
 // `object-contain` and the Studio shows it up to 72vh tall, so a thumbnail standing in for the
 // real image is visibly soft — a crop used to hide that. resolveNftThumb below now serves the
 // case that actually wants a small file.
-export const resolveNftImage = (nft) =>
-  toHttp(
-    nft?.image?.cachedUrl ||
-      nft?.image?.pngUrl ||
-      nft?.image?.originalUrl ||
-      nft?.image?.thumbnailUrl ||
-      nft?.media?.[0]?.gateway ||
-      nft?.raw?.metadata?.image ||
-      nft?.rawMetadata?.image,
-  );
+export const resolveNftImage = (nft) => getImageFromAlchemy(nft);
 
 // The blurred bed painted behind `object-contain` artwork, so a piece that doesn't match its
 // card's shape sits on a soft enlargement of itself instead of on dead bars. Thumbnail first:
 // this gets blurred beyond recognition, so bytes matter and sharpness does not.
 export const resolveNftThumb = (nft) =>
-  toHttp(nft?.image?.thumbnailUrl || nft?.image?.cachedUrl || nft?.image?.pngUrl) ?? null;
+  toHttp(nft?.image?.thumbnailUrl || nft?.image?.cachedUrl || nft?.image?.pngUrl) ||
+  getImageFromAlchemy(nft) ||
+  null;
 
 // Things an animation_url can point at that a <video> can't play. We deny-list rather
 // than allow-list extensions because the video URLs frequently have none at all.
@@ -103,16 +116,23 @@ export const resolveNftDescription = (nft) =>
  * so reference-image preparation wants `originalUrl`/`pngUrl` ahead of it. Returned in
  * preference order for a caller that will try each until one downloads at usable size.
  */
-export const stillCandidates = (nft) =>
-  [
+export const stillCandidates = (nft) => {
+  const metadata = nft?.raw?.metadata ?? nft?.rawMetadata ?? {};
+  const osMetadata = nft?.contract?.openSeaMetadata ?? {};
+
+  return [
     nft?.image?.originalUrl,
     nft?.image?.pngUrl,
     nft?.image?.cachedUrl,
-    nft?.raw?.metadata?.image,
-    nft?.rawMetadata?.image,
+    metadata.image,
+    metadata.image_url,
+    metadata.display_image_url,
+    metadata.original_image_url,
+    osMetadata.imageUrl,
   ]
     .filter((value) => typeof value === 'string' && value.trim())
     .map((value) => toHttp(value.trim()))
     // An "image" field that is really an mp4 is no use as a still.
     .filter((url) => !nft?.image?.contentType?.startsWith('video/') || url !== toHttp(nft.image.originalUrl))
     .filter((url, index, all) => all.indexOf(url) === index);
+};

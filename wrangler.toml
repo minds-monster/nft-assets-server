@@ -27,3 +27,6 @@ NVIDIA_BASE_URL = "https://integrate.api.nvidia.com/v1"
 # X402_WALLET_ADDRESS = ""
 # X402_TOKEN_ADDRESS = ""
 # NVIDIA_API_KEY = ""
+
+[observability]
+enabled = false
