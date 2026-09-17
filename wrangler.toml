@@ -27,3 +27,19 @@ NVIDIA_BASE_URL = "https://integrate.api.nvidia.com/v1"
 # X402_WALLET_ADDRESS = ""
 # X402_TOKEN_ADDRESS = ""
 # NVIDIA_API_KEY = ""
+
+[env.preview]
+name = "nft-assets-server-preview"
+
+[[env.preview.r2_buckets]]
+binding = "R2_BUCKET"
+bucket_name = "nft-assets"
+
+[[env.preview.kv_namespaces]]
+binding = "DOSSIERS"
+id = "5c402c9b702f475aa88b09d99f2a07b6"
+
+[env.preview.vars]
+IPFS_GATEWAY_URL = "https://cloudflare-ipfs.com/ipfs/"
+CASTING_MODEL = "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning"
+NVIDIA_BASE_URL = "https://integrate.api.nvidia.com/v1"

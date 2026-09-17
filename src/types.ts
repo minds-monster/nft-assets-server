@@ -1,4 +1,5 @@
 export interface NormalizedNFT {
+  chain: string;
   contract: string;
   tokenId: string;
   name: string;

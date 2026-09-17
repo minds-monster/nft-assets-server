@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { getDbClient, getCachedAsset, DbAsset, upsertAsset } from '../db';
+import { getDbClient, getCachedMediaFile, DbMediaFile, upsertMediaFile } from '../db';
 import { Env } from '../api-server';
 
 const app = new Hono<{ Bindings: Env }>();
@@ -13,7 +13,7 @@ app.get('/:contractAddress/:tokenId', async (c) => {
   
   // Check if 3D model already exists (format = '3d_model', resolution = 'v1' for now)
   const format = '3d_model';
-  let cached = await getCachedAsset(db, contractAddress, tokenId, format, 'v1').catch(() => null);
+  let cached = await getCachedMediaFile(db, 'eth-mainnet', contractAddress, tokenId, format, 'v1').catch(() => null);
   
   if (cached) {
     return c.json({
@@ -25,7 +25,7 @@ app.get('/:contractAddress/:tokenId', async (c) => {
   }
   
   // We need the nft_id to insert an asset. 
-  const { data: nftsFromDb } = await db.from('nfts')
+  const { data: nftsFromDb } = await db.from('nft_assets')
     .select('id')
     .eq('contract', contractAddress.toLowerCase())
     .eq('token_id', tokenId)
@@ -46,7 +46,7 @@ app.get('/:contractAddress/:tokenId', async (c) => {
   });
   
   // Store info in Supabase
-  const asset: DbAsset = {
+  const asset: DbMediaFile = {
     format,
     resolution: version,
     r2_key: r2Key,
@@ -56,7 +56,7 @@ app.get('/:contractAddress/:tokenId', async (c) => {
   };
   
   try {
-    await upsertAsset(db, nftsFromDb.id, asset);
+    await upsertMediaFile(db, nftsFromDb.id, asset);
   } catch (error: any) {
     return c.json({ error: `Failed to store asset metadata: ${error.message}` }, 500);
   }

@@ -1,6 +1,6 @@
 import { R2Bucket } from '@cloudflare/workers-types';
 import { SupabaseClient } from '@supabase/supabase-js';
-import { upsertNft, upsertAsset, DbNft } from './db';
+import { upsertSubjectIdentity, upsertMediaFile, DbNftAsset } from './db';
 import { NormalizedNFT } from './types';
 
 export interface IngestEnv {
@@ -25,14 +25,15 @@ export async function ingestAsset(
   nft: NormalizedNFT
 ) {
   // 1. Save NFT to DB
-  const dbNft: DbNft = {
+  const dbNft: DbNftAsset = {
+    chain: nft.chain,
     contract: nft.contract,
     token_id: nft.tokenId,
     name: nft.name,
     collection_name: nft.collection,
     media_type: nft.mediaType,
   };
-  const nftId = await upsertNft(db, dbNft);
+  const subjectId = await upsertSubjectIdentity(db, dbNft);
 
   // Prices based on prompt: thumbnail free, image $0.01, video $0.05, audio $0.02
   const priceMap: Record<string, number> = {
@@ -52,19 +53,14 @@ export async function ingestAsset(
       if (!res.ok || !res.body) throw new Error(`Failed to fetch ${url}: ${res.statusText}`);
 
       const contentType = res.headers.get('content-type') || 'application/octet-stream';
-      let extension = 'bin';
-      if (contentType.includes('png')) extension = 'png';
-      else if (contentType.includes('jpeg') || contentType.includes('jpg')) extension = 'jpg';
-      else if (contentType.includes('gif')) extension = 'gif';
-      else if (contentType.includes('mp4')) extension = 'mp4';
-      else if (contentType.includes('mpeg')) extension = 'mp3';
-      else if (contentType.includes('svg')) extension = 'svg';
-      else if (contentType.includes('webp')) extension = 'webp';
 
-      const r2Key = `ethereum/${nft.contract}/${nft.tokenId}/${format}.${extension}`;
+      const r2Key = `cast/${nft.chain}/${nft.contract}/${nft.tokenId}/${format}`;
+
+      // Read stream into buffer to satisfy R2's known length requirement
+      const buffer = await res.arrayBuffer();
 
       // Upload stream to R2
-      const r2Object = await env.R2_BUCKET.put(r2Key, res.body, {
+      const r2Object = await env.R2_BUCKET.put(r2Key, buffer, {
         httpMetadata: { contentType }
       });
 
@@ -75,7 +71,7 @@ export async function ingestAsset(
       const byteSize = r2Object.size;
 
       // Save asset record to DB
-      await upsertAsset(db, nftId, {
+      await upsertMediaFile(db, subjectId, {
         format,
         resolution: 'original',
         r2_key: r2Key,

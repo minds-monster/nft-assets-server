@@ -1,5 +1,6 @@
-export async function fetchArtwork(urls, { maxBytes }) {
-  for (const url of urls) {
+export async function fetchArtwork(urls, options = {}) {
+  const maxBytes = options?.maxBytes;
+  for (const url of (urls || [])) {
     try {
       const res = await fetch(url);
       if (!res.ok) continue;

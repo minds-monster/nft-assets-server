@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { getAlchemyClient, searchNftByKeyword, resolveNftByContract } from './alchemy';
-import { getDbClient, getCachedAsset, getLocalNftByContract, searchLocalNfts } from './db';
+import { getDbClient, getCachedMediaFile, getLocalNftByContract, searchLocalNfts } from './db';
 import { ingestAsset, IngestEnv } from './ingest';
 import { R2Bucket } from '@cloudflare/workers-types';
 
@@ -81,14 +81,14 @@ app.post('/execute-tool', async (c) => {
       const { contract, tokenId, format, resolution } = args;
       
       // Check cache first
-      let cached = await getCachedAsset(db, contract, tokenId, format, resolution || 'original').catch(() => null);
+      let cached = await getCachedMediaFile(db, 'eth-mainnet', contract, tokenId, format, resolution || 'original').catch(() => null);
       
       if (!cached) {
         // Ingest if not cached
         const nfts = await resolveNftByContract(alchemy, contract, tokenId);
         if (nfts.length > 0) {
           await ingestAsset(env, db, nfts[0]);
-          cached = await getCachedAsset(db, contract, tokenId, format, resolution || 'original').catch(() => null);
+          cached = await getCachedMediaFile(db, 'eth-mainnet', contract, tokenId, format, resolution || 'original').catch(() => null);
         }
       }
       

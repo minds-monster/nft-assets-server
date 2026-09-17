@@ -27,7 +27,7 @@ export function normalizeUri(uri: string | undefined): string {
 /**
  * Converts Alchemy's raw NFT metadata into our normalized internal schema.
  */
-export function normalizeNftMetadata(nft: Nft): NormalizedNFT {
+export function normalizeNftMetadata(nft: Nft, chain: string): NormalizedNFT {
   const media = resolveNftMedia(nft as any);
   
   let mediaType: NormalizedNFT['mediaType'] = 'unknown';
@@ -45,6 +45,7 @@ export function normalizeNftMetadata(nft: Nft): NormalizedNFT {
   sourceUri = normalizeUri(sourceUri);
   
   return {
+    chain,
     contract: nft.contract.address.toLowerCase(),
     tokenId: nft.tokenId,
     name: resolveNftName(nft as any),
@@ -61,16 +62,17 @@ export function normalizeNftMetadata(nft: Nft): NormalizedNFT {
  */
 export async function resolveNftByContract(
   alchemy: Alchemy, 
+  chain: string,
   contractAddress: string, 
   tokenId?: string
 ): Promise<NormalizedNFT[]> {
   if (tokenId) {
     const nft = await alchemy.nft.getNftMetadata(contractAddress, tokenId);
-    return [normalizeNftMetadata(nft)];
+    return [normalizeNftMetadata(nft, chain)];
   } else {
     // If no tokenId, return the first 20 NFTs for the contract
     const res = await alchemy.nft.getNftsForContract(contractAddress, { pageSize: 20 });
-    return res.nfts.map(normalizeNftMetadata);
+    return res.nfts.map(nft => normalizeNftMetadata(nft, chain));
   }
 }
 
@@ -93,7 +95,7 @@ export async function searchNftByKeyword(
   for (const contract of topContracts) {
     try {
       const nfts = await alchemy.nft.getNftsForContract(contract.address, { pageSize: 5 });
-      results.push(...nfts.nfts.map(normalizeNftMetadata));
+      results.push(...nfts.nfts.map(nft => normalizeNftMetadata(nft, 'eth-mainnet')));
     } catch (err) {
       console.warn(`Failed to fetch NFTs for contract ${contract.address}`, err);
     }

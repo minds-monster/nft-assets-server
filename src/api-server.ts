@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { ethers } from 'ethers';
 import { getAlchemyClient, searchNftByKeyword, resolveNftByContract } from './alchemy';
-import { getDbClient, getCachedAsset } from './db';
+import { getDbClient, getCachedMediaFile, getNftsWith3dModels } from './db';
 import { ingestAsset, IngestEnv } from './ingest';
 import { BRANDS, SECTORS, BRANDS_BY_SECTOR, LIVE_BRANDS, LIVE_COLLECTIONS } from './brands';
 import castingDirectorRouter from './routes/casting-director';
@@ -9,6 +9,8 @@ import storyboardRouter from './routes/storyboard';
 import { x402Middleware } from './middleware/x402';
 // @ts-ignore
 import { getOpenseaCollectionOwner } from './worker/payments.js';
+// @ts-ignore
+import { handleCastMesh, handleCastMeshGenerate, handleTripoWebhook } from './worker/mesh.js';
 
 import { cors } from 'hono/cors';
 
@@ -20,11 +22,13 @@ export interface Env extends IngestEnv {
   X402_FACILITATOR_URL?: string;
   X402_TOKEN_ADDRESS?: string;
   PRIVATE_KEY?: string;
+  WEBHOOK_URL_BASE?: string;
   
   DOSSIERS?: any; // KVNamespace for caching
   CASTING_MODEL: string;
   NVIDIA_API_KEY: string;
   NVIDIA_BASE_URL: string;
+  TRIPO3D_API_KEY?: string;
 }
 
 const app = new Hono<{ Bindings: Env }>();
@@ -55,13 +59,30 @@ app.get('/search', async (c) => {
   return c.json({ results });
 });
 
+app.get('/nfts/3d', async (c) => {
+  const env = c.env;
+  const db = getDbClient(env.DATABASE_URL, env.DATABASE_KEY);
+  
+  const skip = parseInt(c.req.query('skip') || '0', 10);
+  const take = Math.min(parseInt(c.req.query('take') || '10', 10), 50); // limit max take to 50
+  const search = c.req.query('q') || c.req.query('search') || '';
+
+  try {
+    const { data, count } = await getNftsWith3dModels(db, skip, take, search);
+    return c.json({ data, count, skip, take });
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500);
+  }
+});
+
 app.get('/nft/:contractAddress/:tokenId', async (c) => {
   const env = c.env;
   const contractAddress = c.req.param('contractAddress');
   const tokenId = c.req.param('tokenId');
+  const chain = c.req.query('chain') || 'eth-mainnet';
   
   const alchemy = getAlchemyClient(env.ALCHEMY_API_KEY);
-  const results = await resolveNftByContract(alchemy, contractAddress, tokenId);
+  const results = await resolveNftByContract(alchemy, chain, contractAddress, tokenId);
   
   return c.json({ results });
 });
@@ -70,6 +91,7 @@ app.get('/asset/:contractAddress/:tokenId', async (c) => {
   const env = c.env;
   const contractAddress = c.req.param('contractAddress');
   const tokenId = c.req.param('tokenId');
+  const chain = c.req.query('chain') || 'eth-mainnet';
   
   let format = c.req.query('format'); // e.g., 'thumbnail', 'video', 'audio', 'image'
   const resolution = c.req.query('resolution') || 'original';
@@ -79,8 +101,9 @@ app.get('/asset/:contractAddress/:tokenId', async (c) => {
   
   // If format is not specified, determine the main format from the local DB
   if (!format) {
-    const { data: nftsFromDb } = await db.from('nfts')
+    const { data: nftsFromDb } = await db.from('nft_assets')
       .select('media_type')
+      .eq('chain', chain)
       .eq('contract', contractAddress.toLowerCase())
       .eq('token_id', tokenId)
       .maybeSingle();
@@ -93,12 +116,12 @@ app.get('/asset/:contractAddress/:tokenId', async (c) => {
   // Check cache first
   let cached = null;
   if (format) {
-    cached = await getCachedAsset(db, contractAddress, tokenId, format, resolution).catch(() => null);
+    cached = await getCachedMediaFile(db, chain, contractAddress, tokenId, format, resolution).catch(() => null);
   }
   
   if (!cached) {
     // Ingest if not cached
-    const nfts = await resolveNftByContract(alchemy, contractAddress, tokenId);
+    const nfts = await resolveNftByContract(alchemy, chain, contractAddress, tokenId);
     if (nfts.length > 0) {
       await ingestAsset(env, db, nfts[0]);
       
@@ -107,7 +130,7 @@ app.get('/asset/:contractAddress/:tokenId', async (c) => {
         format = nfts[0].mediaType === 'unknown' ? 'image' : nfts[0].mediaType;
       }
       
-      cached = await getCachedAsset(db, contractAddress, tokenId, format, resolution).catch(() => null);
+      cached = await getCachedMediaFile(db, chain, contractAddress, tokenId, format, resolution).catch(() => null);
     }
   }
   
@@ -131,6 +154,11 @@ app.route('/x402/casting-director', castingDirectorRouter);
 app.route('/storyboard', storyboardRouter);
 app.use('/x402/storyboard/*', x402Middleware(1)); 
 app.route('/x402/storyboard', storyboardRouter);
+
+// 3D Mesh Endpoints
+app.get('/3d-mesh', async (c) => handleCastMesh(c.req.raw, c.env));
+app.post('/3d-mesh/generate', async (c) => handleCastMeshGenerate(c.req.raw, c.env));
+app.post('/webhooks/tripo', async (c) => handleTripoWebhook(c.req.raw, c.env, c.executionCtx));
 
 app.use('/r2/*', x402Middleware(1));
 app.get('/r2/*', async (c) => {
@@ -282,6 +310,89 @@ app.post('/pay-owners', async (c) => {
   }
   
   return c.json({ results });
+});
+
+import { Network } from 'alchemy-sdk';
+import { upsertSubjectIdentity, upsertSubjectDossier, upsertSubjectMesh } from './db';
+
+const getNetworkForChain = (chain: string): Network => {
+  if (chain.includes('base') && chain.includes('sepolia')) return Network.BASE_SEPOLIA;
+  if (chain.includes('base')) return Network.BASE_MAINNET;
+  if (chain.includes('polygon') && chain.includes('amoy')) return Network.MATIC_AMOY;
+  if (chain.includes('polygon')) return Network.MATIC_MAINNET;
+  if (chain.includes('sepolia')) return Network.ETH_SEPOLIA;
+  return Network.ETH_MAINNET;
+};
+
+app.post('/admin/migrate-kv-assets', async (c) => {
+  const env = c.env;
+  if (!env.DOSSIERS) {
+    return c.json({ error: 'DOSSIERS KV not bound' }, 500);
+  }
+  
+  const body = await c.req.json().catch(() => ({}));
+  const cursor = body.cursor;
+  const limit = body.limit || 10;
+  
+  const listResult = await env.DOSSIERS.list({ limit, cursor });
+  const db = getDbClient(env.DATABASE_URL, env.DATABASE_KEY);
+  
+  const results = [];
+  
+  for (const key of listResult.keys) {
+    try {
+      const value = await env.DOSSIERS.get(key.name);
+      if (!value) continue;
+      
+      const parsed = JSON.parse(value);
+      const assetKey = parsed.key || parsed.assetKey;
+      if (!assetKey) {
+        results.push({ key: key.name, status: 'skipped', reason: 'No assetKey found in payload' });
+        continue;
+      }
+      
+      const parts = assetKey.split(':');
+      if (parts.length < 3) {
+        results.push({ key: key.name, status: 'skipped', reason: 'Invalid assetKey format' });
+        continue;
+      }
+      
+      const [chain, contractAddress, tokenId] = parts;
+      
+      if (key.name.startsWith('dossier:v')) {
+        const alchemy = getAlchemyClient(env.ALCHEMY_API_KEY, getNetworkForChain(chain));
+        const nfts = await resolveNftByContract(alchemy, chain, contractAddress, tokenId);
+        
+        if (nfts.length > 0) {
+          const nft = nfts[0];
+          // Use source image from dossier if alchemy failed to get it
+          if (parsed.sourceImageUrls && parsed.sourceImageUrls.length > 0) {
+            nft.sourceUri = parsed.sourceImageUrls[0];
+          }
+          await ingestAsset(env, db, nft);
+          
+          await upsertSubjectDossier(db, chain, contractAddress, tokenId, parsed.schemaVersion || 1, parsed);
+          results.push({ key: key.name, status: 'success', type: 'dossier' });
+        } else {
+          results.push({ key: key.name, status: 'failed', reason: 'Could not fetch NFT from Alchemy' });
+        }
+      } else if (key.name.startsWith('castmesh:v')) {
+        await upsertSubjectMesh(db, chain, contractAddress, tokenId, parsed);
+        results.push({ key: key.name, status: 'success', type: 'castmesh' });
+      } else {
+        results.push({ key: key.name, status: 'skipped', reason: 'Unknown key prefix' });
+      }
+    } catch (e: any) {
+      results.push({ key: key.name, status: 'error', error: e.message });
+    }
+  }
+  
+  return c.json({
+    success: true,
+    cursor: listResult.cursor,
+    list_complete: listResult.list_complete,
+    results
+  });
 });
 
 export default app;

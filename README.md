@@ -35,6 +35,18 @@ This MCP server indexes high-resolution Ethereum NFT assets and serves them to A
    npm run dev
    ```
 
+## Deployment
+
+To deploy a preview version to Cloudflare:
+```bash
+npx wrangler deploy --env preview
+```
+
+To set secrets for the preview environment (such as API keys and database credentials):
+```bash
+npx wrangler secret put <SECRET_NAME> --env preview
+```
+
 ## Pricing Configuration
 
 Pricing is statically configured per asset format in `src/ingest.ts` and `src/mcp-server.ts`. Current defaults:

@@ -21,6 +21,9 @@ import {
   resolveNftVideo,
   resolveNftDescription,
 } from './nftMedia.js';
+import { getDbClient, getSubject, upsertSubjectDossier, upsertSubjectIdentity } from '../db';
+import { normalizeNftMetadata } from '../alchemy';
+import { ingestAsset } from '../ingest';
 
 // Bump when the schema, the brief, or the pipeline changes in a way that makes stored
 // dossiers wrong. Old entries are then simply never read again — cheaper and safer than a
@@ -635,14 +638,22 @@ export const castPiece = async ({ key, nft, refresh = false, previsNote }, env, 
       await payCreator(key, env, emit);
     }
     
+    const db = getDbClient(env.DATABASE_URL, env.DATABASE_KEY);
+
     // A warm dossier skips every model call, so there is nothing to stream and nothing to
     // wait for — it resolves in one round trip. Saying so is what makes the cache legible
     // rather than making a known piece look skipped.
-    if (!refresh && env.DOSSIERS) {
-      const hit = await env.DOSSIERS.get(cacheKey, 'json');
-      if (hit) {
-        await emit('result', { ...hit, cached: true });
-        return;
+    const [chain, contract, tokenId] = key.split(':');
+    
+    if (!refresh) {
+      try {
+        const hit = await getSubject(db, chain, contract, tokenId);
+        if (hit && hit.dossier_version === SCHEMA_VERSION && hit.dossier_data) {
+          await emit('result', { ...hit.dossier_data, cached: true });
+          return;
+        }
+      } catch (e) {
+        console.warn('Failed to read from db', e);
       }
     }
 
@@ -765,7 +776,36 @@ export const castPiece = async ({ key, nft, refresh = false, previsNote }, env, 
     // No expirationTtl: the artwork behind a token id cannot change, so a dossier is a
     // permanent fact, not a cached one. This is what makes a warm cast instant and keeps
     // repeat traffic off a rate-limited free tier.
-    if (env.DOSSIERS) await env.DOSSIERS.put(cacheKey, JSON.stringify(record));
+    try {
+      if (nft?.contract?.address && nft?.tokenId) {
+        const metadata = nft.raw?.metadata ?? nft.rawMetadata ?? {};
+        const collectionName =
+          nft.contract?.openSeaMetadata?.collectionName ||
+          nft.contract?.name ||
+          '';
+
+        await upsertSubjectIdentity(db, {
+          chain: chain,
+          contract: nft.contract.address,
+          token_id: nft.tokenId,
+          name: nft.title || metadata.name || '',
+          collection_name: collectionName,
+          media_type: nft.media?.[0]?.format || 'unknown',
+          ai_description: dossier.subject
+        });
+
+        const normalized = normalizeNftMetadata(nft, chain);
+        if (ctx && typeof ctx.waitUntil === 'function') {
+          ctx.waitUntil(ingestAsset(env, db, normalized).catch(e => console.warn('Ingest failed:', e)));
+        } else {
+          ingestAsset(env, db, normalized).catch(e => console.warn('Ingest failed:', e));
+        }
+      }
+      
+      await upsertSubjectDossier(db, chain, contract, tokenId, SCHEMA_VERSION, record);
+    } catch (e) {
+      console.warn('Failed to save to db', e);
+    }
 
     await emit('result', { ...record, cached: false });
   }, ctx);
