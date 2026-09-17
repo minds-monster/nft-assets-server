@@ -64,7 +64,7 @@ export const payCreator = async (key, env, emit) => {
         `https://base-sepolia.g.alchemy.com/v2/${env.ALCHEMY_API_KEY}` : `https://base-mainnet.g.alchemy.com/v2/${env.ALCHEMY_API_KEY}`;
       
       const provider = new ethers.JsonRpcProvider(rpcUrl);
-      const wallet = new ethers.Wallet(env.PRIVATE_KEY, provider);
+      const wallet = new ethers.NonceManager(new ethers.Wallet(env.PRIVATE_KEY, provider));
       
       const tokenAddress = isTestnet ? env.X402_TEST_TOKEN_ADDRESS : env.X402_TOKEN_ADDRESS;
       const tokenContract = new ethers.Contract(

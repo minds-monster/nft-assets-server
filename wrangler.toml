@@ -28,5 +28,6 @@ NVIDIA_BASE_URL = "https://integrate.api.nvidia.com/v1"
 # X402_TOKEN_ADDRESS = ""
 # NVIDIA_API_KEY = ""
 
-[observability]
-enabled = false
+[observability.logs]
+enabled = true
+invocation_logs = true
