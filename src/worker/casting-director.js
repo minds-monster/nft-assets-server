@@ -293,14 +293,19 @@ Return the dossier by calling the emit_dossier tool. Do not write prose.`;
  * models do not accept.
  */
 export const castingStills = (nft) => {
-  const rawMetadata = nft?.raw?.metadata ?? nft?.rawMetadata ?? {};
+  const metadata = nft?.raw?.metadata ?? nft?.rawMetadata ?? {};
+  const osMetadata = nft?.contract?.openSeaMetadata ?? {};
   return [
     nft?.image?.pngUrl,
     nft?.image?.cachedUrl,
     nft?.image?.originalUrl,
     nft?.image?.thumbnailUrl,
     nft?.media?.[0]?.gateway,
-    rawMetadata.image,
+    metadata.image,
+    metadata.image_url,
+    metadata.display_image_url,
+    metadata.original_image_url,
+    osMetadata.imageUrl,
   ]
     .filter((value) => typeof value === 'string' && value.trim())
     .map((value) => toHttp(value.trim()))
